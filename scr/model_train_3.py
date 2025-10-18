@@ -6,10 +6,12 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import DatasetFolder
 import torch.optim as optim
-from tools.hw3_model import resnet18
+from tools.hw3_model import resnet18, FoodCNN, FoodCNN_2
 from tools.hw3_common_tools import plot_loss_curves, plot_accuracy_curves, plot_training_curves
 from PIL import Image
 import torchvision.transforms as transforms
+
+#发现图像是512*512的之前的transform不对，修改。这个用自己建的模型
 
 
 # 定义可序列化的图片加载函数
@@ -39,7 +41,9 @@ if __name__ == "__main__":
 
     # 训练超参数
     MAX_EPOCH = 182  # 总训练轮数，基于64000次迭代计算得出
-    BATCH_SIZE = 128  # 批大小
+    BATCH_SIZE = 32
+    # 大图像选小batch_size
+    # BATCH_SIZE = 128  # 批大小
     LR = 0.1
     log_interval = 1
     PATIENCE = 20
@@ -47,18 +51,39 @@ if __name__ == "__main__":
 
 
     # ============================ step 1/5 数据加载 ============================
+    #图片大小是512*512，这个transform太小了
+    # train_tfm = transforms.Compose([
+    #     transforms.Resize((128, 128)),
+    #     transforms.RandomHorizontalFlip(p=0.5),
+    #     transforms.RandomRotation(degrees=15),
+    #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    #     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # ])
+    #
+    # test_tfm = transforms.Compose([
+    #     transforms.Resize((128, 128)),
+    #     transforms.ToTensor(),
+    #     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    # ])
+
+    # 针对高分辨率的数据增强
     train_tfm = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((512, 512)),  # 保持高分辨率
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomRotation(degrees=15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        transforms.RandomCrop(512, padding=16),  # 随机裁剪+填充
+        transforms.RandomGrayscale(p=0.1),
+        transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),  # 更大的模糊核
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     test_tfm = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((512, 512)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -120,7 +145,7 @@ if __name__ == "__main__":
     print(f"数据加载进程数: {num_workers}")
 
     # ============================ step 2/5 模型定义 ============================
-    model = resnet18(num_classes=11)
+    model = FoodCNN_2(num_classes=11)
     model.to(device)
 
     # 打印模型信息
@@ -133,8 +158,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()  # 分类任务用交叉熵损失
 
     # ============================ step 4/5 优化器 ============================
-    # 使用SGD，通常对ResNet效果更好
-    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, gamma=0.1, milestones=milestones)
 
     # ============================ step 5/5 训练循环 ============================

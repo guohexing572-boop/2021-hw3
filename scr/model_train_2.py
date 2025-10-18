@@ -6,11 +6,12 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import DatasetFolder
 import torch.optim as optim
-from tools.hw3_model import resnet18
+from tools.hw3_model import resnet18,FoodCNN
 from tools.hw3_common_tools import plot_loss_curves, plot_accuracy_curves, plot_training_curves
 from PIL import Image
 import torchvision.transforms as transforms
 
+#自制模型 AdamW
 
 # 定义可序列化的图片加载函数
 def pil_loader(path):
@@ -120,7 +121,7 @@ if __name__ == "__main__":
     print(f"数据加载进程数: {num_workers}")
 
     # ============================ step 2/5 模型定义 ============================
-    model = resnet18(num_classes=11)
+    model = FoodCNN(num_classes=11)
     model.to(device)
 
     # 打印模型信息
@@ -133,8 +134,7 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()  # 分类任务用交叉熵损失
 
     # ============================ step 4/5 优化器 ============================
-    # 使用SGD，通常对ResNet效果更好
-    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.9, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, gamma=0.1, milestones=milestones)
 
     # ============================ step 5/5 训练循环 ============================
